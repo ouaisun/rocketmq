@@ -16,19 +16,21 @@
  */
 package org.apache.rocketmq.common.filter;
 
-import java.net.URL;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 
+import java.net.URL;
+
 public class FilterAPI {
+
     public static URL classFile(final String className) {
         final String javaSource = simpleClassName(className) + ".java";
-        URL url = FilterAPI.class.getClassLoader().getResource(javaSource);
+        URL          url        = FilterAPI.class.getClassLoader().getResource(javaSource);
         return url;
     }
 
     public static String simpleClassName(final String className) {
         String simple = className;
-        int index = className.lastIndexOf(".");
+        int    index  = className.lastIndexOf(".");
         if (index >= 0) {
             simple = className.substring(index + 1);
         }
@@ -36,12 +38,12 @@ public class FilterAPI {
         return simple;
     }
 
-    public static SubscriptionData buildSubscriptionData(final String consumerGroup, String topic,
-        String subString) throws Exception {
+    public static SubscriptionData buildSubscriptionData(final String consumerGroup, String topic, String subString) throws Exception {
+
         SubscriptionData subscriptionData = new SubscriptionData();
         subscriptionData.setTopic(topic);
         subscriptionData.setSubString(subString);
-
+        // 处理订阅表达式
         if (null == subString || subString.equals(SubscriptionData.SUB_ALL) || subString.length() == 0) {
             subscriptionData.setSubString(SubscriptionData.SUB_ALL);
         } else {
@@ -65,7 +67,7 @@ public class FilterAPI {
     }
 
     public static SubscriptionData build(final String topic, final String subString,
-        final String type) throws Exception {
+                                         final String type) throws Exception {
         if (ExpressionType.TAG.equals(type) || type == null) {
             return buildSubscriptionData(null, topic, subString);
         }

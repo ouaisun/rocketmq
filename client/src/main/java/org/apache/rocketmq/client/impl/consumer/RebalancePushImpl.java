@@ -16,9 +16,6 @@
  */
 package org.apache.rocketmq.client.impl.consumer;
 
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
 import org.apache.rocketmq.client.consumer.store.OffsetStore;
 import org.apache.rocketmq.client.consumer.store.ReadOffsetType;
@@ -31,6 +28,10 @@ import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.protocol.heartbeat.ConsumeType;
 import org.apache.rocketmq.common.protocol.heartbeat.MessageModel;
 import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
+
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public class RebalancePushImpl extends RebalanceImpl {
     private final static long UNLOCK_DELAY_TIME_MILLS = Long.parseLong(System.getProperty("rocketmq.client.unlockDelayTimeMills", "20000"));
@@ -83,8 +84,10 @@ public class RebalancePushImpl extends RebalanceImpl {
 
     @Override
     public boolean removeUnnecessaryMessageQueue(MessageQueue mq, ProcessQueue pq) {
+        // 同步队列的消费进度，并移除之。
         this.defaultMQPushConsumerImpl.getOffsetStore().persist(mq);
         this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);
+        // TODO 顺序消费
         if (this.defaultMQPushConsumerImpl.isConsumeOrderly()
             && MessageModel.CLUSTERING.equals(this.defaultMQPushConsumerImpl.messageModel())) {
             try {
@@ -145,7 +148,7 @@ public class RebalancePushImpl extends RebalanceImpl {
         switch (consumeFromWhere) {
             case CONSUME_FROM_LAST_OFFSET_AND_FROM_MIN_WHEN_BOOT_FIRST:
             case CONSUME_FROM_MIN_OFFSET:
-            case CONSUME_FROM_MAX_OFFSET:
+            case CONSUME_FROM_MAX_OFFSET:// 废弃
             case CONSUME_FROM_LAST_OFFSET: {
                 long lastOffset = offsetStore.readOffset(mq, ReadOffsetType.READ_FROM_STORE);
                 if (lastOffset >= 0) {

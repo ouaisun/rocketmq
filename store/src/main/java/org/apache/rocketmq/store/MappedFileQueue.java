@@ -16,6 +16,11 @@
  */
 package org.apache.rocketmq.store;
 
+import org.apache.rocketmq.common.UtilAll;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -24,13 +29,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.CopyOnWriteArrayList;
-import org.apache.rocketmq.common.UtilAll;
-import org.apache.rocketmq.common.constant.LoggerName;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MappedFileQueue {
-    private static final Logger log = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
+
+    private static final Logger log       = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
     private static final Logger LOG_ERROR = LoggerFactory.getLogger(LoggerName.STORE_ERROR_LOGGER_NAME);
 
     private static final int DELETE_FILES_BATCH_MAX = 10;
@@ -43,13 +45,13 @@ public class MappedFileQueue {
 
     private final AllocateMappedFileService allocateMappedFileService;
 
-    private long flushedWhere = 0;
+    private long flushedWhere   = 0;
     private long committedWhere = 0;
 
     private volatile long storeTimestamp = 0;
 
     public MappedFileQueue(final String storePath, int mappedFileSize,
-        AllocateMappedFileService allocateMappedFileService) {
+                           AllocateMappedFileService allocateMappedFileService) {
         this.storePath = storePath;
         this.mappedFileSize = mappedFileSize;
         this.allocateMappedFileService = allocateMappedFileService;
@@ -59,14 +61,14 @@ public class MappedFileQueue {
 
         if (!this.mappedFiles.isEmpty()) {
             Iterator<MappedFile> iterator = mappedFiles.iterator();
-            MappedFile pre = null;
+            MappedFile           pre      = null;
             while (iterator.hasNext()) {
                 MappedFile cur = iterator.next();
 
                 if (pre != null) {
                     if (cur.getFileFromOffset() - pre.getFileFromOffset() != this.mappedFileSize) {
                         LOG_ERROR.error("[BUG]The mappedFile queue's data is damaged, the adjacent mappedFile's offset don't match. pre file {}, cur file {}",
-                            pre.getFileName(), cur.getFileName());
+                                pre.getFileName(), cur.getFileName());
                     }
                 }
                 pre = cur;
@@ -145,7 +147,7 @@ public class MappedFileQueue {
     }
 
     public boolean load() {
-        File dir = new File(this.storePath);
+        File   dir   = new File(this.storePath);
         File[] files = dir.listFiles();
         if (files != null) {
             // ascending order
@@ -154,7 +156,7 @@ public class MappedFileQueue {
 
                 if (file.length() != this.mappedFileSize) {
                     log.warn(file + "\t" + file.length()
-                        + " length not matched message store config value, ignore it");
+                            + " length not matched message store config value, ignore it");
                     return true;
                 }
 
@@ -192,26 +194,30 @@ public class MappedFileQueue {
     }
 
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
-        long createOffset = -1;
+        //获取最后一个 MappedFile，若不存在或文件已满，则进行创建
+        // 创建文件开始offset。-1时，不创建
+        long       createOffset   = -1;
         MappedFile mappedFileLast = getLastMappedFile();
 
-        if (mappedFileLast == null) {
+        //计算当文件不存在或已满时，新创建文件的 createOffset
+        if (mappedFileLast == null) {// 一个映射文件都不存在
             createOffset = startOffset - (startOffset % this.mappedFileSize);
         }
 
-        if (mappedFileLast != null && mappedFileLast.isFull()) {
+        if (mappedFileLast != null && mappedFileLast.isFull()) {// 最后一个文件已满
             createOffset = mappedFileLast.getFileFromOffset() + this.mappedFileSize;
         }
 
-        if (createOffset != -1 && needCreate) {
-            String nextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
-            String nextNextFilePath = this.storePath + File.separator
-                + UtilAll.offset2FileName(createOffset + this.mappedFileSize);
+        if (createOffset != -1 && needCreate) {// 创建文件
+            //file的命名规则
+            //fileName[n] = fileName[n - 1] + n * mappedFileSize fileName[0] = startOffset - (startOffset % this.mappedFileSize)
+            String nextFilePath     = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
+            String nextNextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset + this.mappedFileSize);
+
             MappedFile mappedFile = null;
 
             if (this.allocateMappedFileService != null) {
-                mappedFile = this.allocateMappedFileService.putRequestAndReturnMappedFile(nextFilePath,
-                    nextNextFilePath, this.mappedFileSize);
+                mappedFile = this.allocateMappedFileService.putRequestAndReturnMappedFile(nextFilePath, nextNextFilePath, this.mappedFileSize);
             } else {
                 try {
                     mappedFile = new MappedFile(nextFilePath, this.mappedFileSize);
@@ -260,7 +266,7 @@ public class MappedFileQueue {
 
         if (mappedFileLast != null) {
             long lastOffset = mappedFileLast.getFileFromOffset() +
-                mappedFileLast.getWrotePosition();
+                    mappedFileLast.getWrotePosition();
             long diff = lastOffset - offset;
 
             final int maxDiff = this.mappedFileSize * 2;
@@ -334,21 +340,21 @@ public class MappedFileQueue {
     }
 
     public int deleteExpiredFileByTime(final long expiredTime,
-        final int deleteFilesInterval,
-        final long intervalForcibly,
-        final boolean cleanImmediately) {
+                                       final int deleteFilesInterval,
+                                       final long intervalForcibly,
+                                       final boolean cleanImmediately) {
         Object[] mfs = this.copyMappedFiles(0);
 
         if (null == mfs)
             return 0;
 
-        int mfsLength = mfs.length - 1;
-        int deleteCount = 0;
-        List<MappedFile> files = new ArrayList<MappedFile>();
+        int              mfsLength   = mfs.length - 1;
+        int              deleteCount = 0;
+        List<MappedFile> files       = new ArrayList<MappedFile>();
         if (null != mfs) {
             for (int i = 0; i < mfsLength; i++) {
-                MappedFile mappedFile = (MappedFile) mfs[i];
-                long liveMaxTimestamp = mappedFile.getLastModifiedTimestamp() + expiredTime;
+                MappedFile mappedFile       = (MappedFile) mfs[i];
+                long       liveMaxTimestamp = mappedFile.getLastModifiedTimestamp() + expiredTime;
                 if (System.currentTimeMillis() >= liveMaxTimestamp || cleanImmediately) {
                     if (mappedFile.destroy(intervalForcibly)) {
                         files.add(mappedFile);
@@ -382,23 +388,23 @@ public class MappedFileQueue {
     public int deleteExpiredFileByOffset(long offset, int unitSize) {
         Object[] mfs = this.copyMappedFiles(0);
 
-        List<MappedFile> files = new ArrayList<MappedFile>();
-        int deleteCount = 0;
+        List<MappedFile> files       = new ArrayList<MappedFile>();
+        int              deleteCount = 0;
         if (null != mfs) {
 
             int mfsLength = mfs.length - 1;
 
             for (int i = 0; i < mfsLength; i++) {
-                boolean destroy;
-                MappedFile mappedFile = (MappedFile) mfs[i];
-                SelectMappedBufferResult result = mappedFile.selectMappedBuffer(this.mappedFileSize - unitSize);
+                boolean                  destroy;
+                MappedFile               mappedFile = (MappedFile) mfs[i];
+                SelectMappedBufferResult result     = mappedFile.selectMappedBuffer(this.mappedFileSize - unitSize);
                 if (result != null) {
                     long maxOffsetInLogicQueue = result.getByteBuffer().getLong();
                     result.release();
                     destroy = maxOffsetInLogicQueue < offset;
                     if (destroy) {
                         log.info("physic min offset " + offset + ", logics in current mappedFile max offset "
-                            + maxOffsetInLogicQueue + ", delete it");
+                                + maxOffsetInLogicQueue + ", delete it");
                     }
                 } else if (!mappedFile.isAvailable()) { // Handle hanged file.
                     log.warn("Found a hanged consume queue file, attempting to delete it.");
@@ -423,12 +429,13 @@ public class MappedFileQueue {
     }
 
     public boolean flush(final int flushLeastPages) {
-        boolean result = true;
+        boolean    result     = true;
         MappedFile mappedFile = this.findMappedFileByOffset(this.flushedWhere, this.flushedWhere == 0);
         if (mappedFile != null) {
             long tmpTimeStamp = mappedFile.getStoreTimestamp();
-            int offset = mappedFile.flush(flushLeastPages);
-            long where = mappedFile.getFileFromOffset() + offset;
+
+            int  offset = mappedFile.flush(flushLeastPages);
+            long where  = mappedFile.getFileFromOffset() + offset;
             result = where == this.flushedWhere;
             this.flushedWhere = where;
             if (0 == flushLeastPages) {
@@ -440,11 +447,11 @@ public class MappedFileQueue {
     }
 
     public boolean commit(final int commitLeastPages) {
-        boolean result = true;
+        boolean    result     = true;
         MappedFile mappedFile = this.findMappedFileByOffset(this.committedWhere, this.committedWhere == 0);
         if (mappedFile != null) {
-            int offset = mappedFile.commit(commitLeastPages);
-            long where = mappedFile.getFileFromOffset() + offset;
+            int  offset = mappedFile.commit(commitLeastPages);
+            long where  = mappedFile.getFileFromOffset() + offset;
             result = where == this.committedWhere;
             this.committedWhere = where;
         }
@@ -455,8 +462,9 @@ public class MappedFileQueue {
     /**
      * Finds a mapped file by offset.
      *
-     * @param offset Offset.
+     * @param offset                Offset.
      * @param returnFirstOnNotFound If the mapped file is not found, then return the first one.
+     *
      * @return Mapped file or null (when not found and returnFirstOnNotFound is <code>false</code>).
      */
     public MappedFile findMappedFileByOffset(final long offset, final boolean returnFirstOnNotFound) {
@@ -466,12 +474,12 @@ public class MappedFileQueue {
                 int index = (int) ((offset / this.mappedFileSize) - (mappedFile.getFileFromOffset() / this.mappedFileSize));
                 if (index < 0 || index >= this.mappedFiles.size()) {
                     LOG_ERROR.warn("Offset for {} not matched. Request offset: {}, index: {}, " +
-                            "mappedFileSize: {}, mappedFiles count: {}",
-                        mappedFile,
-                        offset,
-                        index,
-                        this.mappedFileSize,
-                        this.mappedFiles.size());
+                                    "mappedFileSize: {}, mappedFiles count: {}",
+                            mappedFile,
+                            offset,
+                            index,
+                            this.mappedFileSize,
+                            this.mappedFiles.size());
                 }
 
                 try {

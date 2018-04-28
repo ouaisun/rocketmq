@@ -16,33 +16,45 @@
  */
 package org.apache.rocketmq.client.impl.consumer;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import org.apache.rocketmq.client.impl.factory.MQClientInstance;
 import org.apache.rocketmq.client.log.ClientLogger;
 import org.apache.rocketmq.common.ServiceThread;
 import org.apache.rocketmq.common.utils.ThreadUtils;
 import org.slf4j.Logger;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+
 public class PullMessageService extends ServiceThread {
-    private final Logger log = ClientLogger.getLog();
+
+    private final Logger                           log              = ClientLogger.getLog();
+    //拉取消息请求队列
     private final LinkedBlockingQueue<PullRequest> pullRequestQueue = new LinkedBlockingQueue<PullRequest>();
+    //MQClient对象
     private final MQClientInstance mQClientFactory;
+    //定时器。用于延迟提交拉取请求
     private final ScheduledExecutorService scheduledExecutorService = Executors
-        .newSingleThreadScheduledExecutor(new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return new Thread(r, "PullMessageServiceScheduledThread");
-            }
-        });
+            .newSingleThreadScheduledExecutor(new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(r, "PullMessageServiceScheduledThread");
+                }
+            });
 
     public PullMessageService(MQClientInstance mQClientFactory) {
         this.mQClientFactory = mQClientFactory;
     }
 
+    /**
+     * 27:      * 执行延迟拉取消息请求
+     * 28:      *
+     * 29:      * @param pullRequest 拉取消息请求
+     * 30:      * @param timeDelay 延迟时长
+     * 31:
+     */
     public void executePullRequestLater(final PullRequest pullRequest, final long timeDelay) {
         this.scheduledExecutorService.schedule(new Runnable() {
 
@@ -53,6 +65,12 @@ public class PullMessageService extends ServiceThread {
         }, timeDelay, TimeUnit.MILLISECONDS);
     }
 
+    /**
+     * 43:      * 执行立即拉取消息请求
+     * 44:      *
+     * 45:      * @param pullRequest 拉取消息请求
+     * 46:
+     */
     public void executePullRequestImmediately(final PullRequest pullRequest) {
         try {
             this.pullRequestQueue.put(pullRequest);
@@ -61,6 +79,13 @@ public class PullMessageService extends ServiceThread {
         }
     }
 
+    /**
+     * 56:      * 执行延迟任务
+     * 57:      *
+     * 58:      * @param r 任务
+     * 59:      * @param timeDelay 延迟时长
+     * 60:
+     */
     public void executeTaskLater(final Runnable r, final long timeDelay) {
         this.scheduledExecutorService.schedule(r, timeDelay, TimeUnit.MILLISECONDS);
     }
@@ -69,6 +94,12 @@ public class PullMessageService extends ServiceThread {
         return scheduledExecutorService;
     }
 
+    /**
+     * 70:      * 拉取消息
+     * 71:      *
+     * 72:      * @param pullRequest 拉取消息请求
+     * 73:
+     */
     private void pullMessage(final PullRequest pullRequest) {
         final MQConsumerInner consumer = this.mQClientFactory.selectConsumer(pullRequest.getConsumerGroup());
         if (consumer != null) {

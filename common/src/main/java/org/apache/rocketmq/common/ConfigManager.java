@@ -16,16 +16,19 @@
  */
 package org.apache.rocketmq.common;
 
-import java.io.IOException;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+
 public abstract class ConfigManager {
+
     private static final Logger log = LoggerFactory.getLogger(LoggerName.COMMON_LOGGER_NAME);
 
     public abstract String encode();
 
+    // 加载文件
     public boolean load() {
         String fileName = null;
         try {
@@ -45,8 +48,20 @@ public abstract class ConfigManager {
         }
     }
 
+    /**
+     * 35:  * 配置文件地址
+     * 36:  *
+     * 37:  * @return 配置文件地址
+     * 38:
+     */
     public abstract String configFilePath();
 
+    /**
+     * 42:  * 加载备份文件
+     * 43:  *
+     * 44:  * @return 是否成功
+     * 45:
+     */
     private boolean loadBak() {
         String fileName = null;
         try {
@@ -67,6 +82,10 @@ public abstract class ConfigManager {
 
     public abstract void decode(final String jsonString);
 
+    /**
+     * 72:  * 持久化
+     * 73:
+     */
     public synchronized void persist() {
         String jsonString = this.encode(true);
         if (jsonString != null) {
@@ -79,5 +98,12 @@ public abstract class ConfigManager {
         }
     }
 
+    /**
+     * 87:  * 编码存储内容
+     * 88:  *
+     * 89:  * @param prettyFormat 是否格式化
+     * 90:  * @return 内容
+     * 91:
+     */
     public abstract String encode(final boolean prettyFormat);
 }

@@ -34,17 +34,18 @@ public class DefaultMessageFilter implements MessageFilter {
         if (null == tagsCode || null == subscriptionData) {
             return true;
         }
-
+        // classFilter
         if (subscriptionData.isClassFilterMode()) {
             return true;
         }
-
+        // 订阅表达式 全匹配
+        // 订阅数据code数组 是否包含 消息tagsCode
         return subscriptionData.getSubString().equals(SubscriptionData.SUB_ALL)
-            || subscriptionData.getCodeSet().contains(tagsCode.intValue());
+                || subscriptionData.getCodeSet().contains(tagsCode.intValue());
     }
 
     @Override
-    public boolean isMatchedByCommitLog(ByteBuffer msgBuffer, Map<String, String> properties) {
+    public boolean isMatchedByCommitLog(ByteBuffer msgBuffer, Map<String,String> properties) {
         return true;
     }
 }

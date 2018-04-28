@@ -16,11 +16,12 @@
  */
 package org.apache.rocketmq.client.consumer.rebalance;
 
+import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
+import org.apache.rocketmq.common.message.MessageQueue;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
-import org.apache.rocketmq.common.message.MessageQueue;
 
 /**
  * Computer room Hashing queue algorithm, such as Alipay logic room
@@ -29,13 +30,15 @@ public class AllocateMessageQueueByMachineRoom implements AllocateMessageQueueSt
     private Set<String> consumeridcs;
 
     @Override
-    public List<MessageQueue> allocate(String consumerGroup, String currentCID, List<MessageQueue> mqAll,
-        List<String> cidAll) {
+    public List<MessageQueue> allocate(String consumerGroup, String currentCID, List<MessageQueue> mqAll,List<String> cidAll) {
+        // 参数校验
         List<MessageQueue> result = new ArrayList<MessageQueue>();
         int currentIndex = cidAll.indexOf(currentCID);
         if (currentIndex < 0) {
             return result;
         }
+
+        // 计算符合当前配置的消费者数组('consumeridcs')对应的消息队列
         List<MessageQueue> premqAll = new ArrayList<MessageQueue>();
         for (MessageQueue mq : mqAll) {
             String[] temp = mq.getBrokerName().split("@");
@@ -44,6 +47,7 @@ public class AllocateMessageQueueByMachineRoom implements AllocateMessageQueueSt
             }
         }
 
+        // 平均分配
         int mod = premqAll.size() / cidAll.size();
         int rem = premqAll.size() % cidAll.size();
         int startIndex = mod * currentIndex;
