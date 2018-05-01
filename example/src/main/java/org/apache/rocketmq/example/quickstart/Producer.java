@@ -22,16 +22,21 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.remoting.common.RemotingHelper;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * This class demonstrates how to send messages to brokers using provided {@link DefaultMQProducer}.
  */
 public class Producer {
+
     public static void main(String[] args) throws MQClientException, InterruptedException {
 
         /*
          * Instantiate with a producer group name.
          */
-        DefaultMQProducer producer = new DefaultMQProducer("please_rename_unique_group_name");
+        final DefaultMQProducer producer = new DefaultMQProducer("Producer");
 
         /*
          * Specify name server addresses.
@@ -48,31 +53,46 @@ public class Producer {
         /*
          * Launch the instance.
          */
+        producer.setNamesrvAddr("10.95.116.57:9876");
         producer.start();
+        Thread.sleep(1000);
+        ExecutorService      executorService = Executors.newFixedThreadPool(10);
+        final CountDownLatch countDownLatch  = new CountDownLatch(2);
+        for (int i = 0; i < 1; i++) {
+            final int index = i;
 
-        for (int i = 0; i < 1000; i++) {
-            try {
+            executorService.submit(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        /*
+                         * Create a message instance, specifying topic, tag and message body.
+                         */
+                        countDownLatch.countDown();
+                        Message msg = new Message("TopicTest" /* Topic */,
+                                "TagA" /* Tag */,
+                                ("Hello RocketMQ " + index).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
+                        );
 
-                /*
-                 * Create a message instance, specifying topic, tag and message body.
-                 */
-                Message msg = new Message("TopicTest" /* Topic */,
-                    "TagA" /* Tag */,
-                    ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET) /* Message body */
-                );
+                        /*
+                         * Call send message to deliver message to one of brokers.
+                         */
+                        SendResult sendResult = producer.send(msg);
 
-                /*
-                 * Call send message to deliver message to one of brokers.
-                 */
-                SendResult sendResult = producer.send(msg);
-
-                System.out.printf("%s%n", sendResult);
-            } catch (Exception e) {
-                e.printStackTrace();
-                Thread.sleep(1000);
-            }
+                        System.out.printf("%d -> %s%n", countDownLatch.getCount(), sendResult);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException e1) {
+                            e1.printStackTrace();
+                        }
+                    }
+                }
+            });
         }
-
+        countDownLatch.await();
+        System.out.println("out");
         /*
          * Shut down once the producer instance is not longer in use.
          */

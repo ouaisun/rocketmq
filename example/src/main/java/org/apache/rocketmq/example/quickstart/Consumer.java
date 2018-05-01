@@ -16,7 +16,6 @@
  */
 package org.apache.rocketmq.example.quickstart;
 
-import java.util.List;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
 import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
@@ -24,6 +23,9 @@ import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.common.consumer.ConsumeFromWhere;
 import org.apache.rocketmq.common.message.MessageExt;
+
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This example shows how to subscribe and consume messages using providing {@link DefaultMQPushConsumer}.
@@ -35,7 +37,7 @@ public class Consumer {
         /*
          * Instantiate with specified consumer group name.
          */
-        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("please_rename_unique_group_name_4");
+        DefaultMQPushConsumer consumer = new DefaultMQPushConsumer("PushConsumer");
 
         /*
          * Specify name server addresses.
@@ -52,22 +54,24 @@ public class Consumer {
         /*
          * Specify where to start in case the specified consumer group is a brand new one.
          */
-        consumer.setConsumeFromWhere(ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
-
         /*
          * Subscribe one more more topics to consume.
          */
+        consumer.setNamesrvAddr("10.95.116.57:9876");
         consumer.subscribe("TopicTest", "*");
-
+        consumer.setConsumeFromWhere(
+                ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET);
         /*
          *  Register callback to execute on arrival of messages fetched from brokers.
          */
+        final AtomicInteger count = new AtomicInteger();
         consumer.registerMessageListener(new MessageListenerConcurrently() {
 
             @Override
             public ConsumeConcurrentlyStatus consumeMessage(List<MessageExt> msgs,
-                ConsumeConcurrentlyContext context) {
-                System.out.printf("%s Receive New Messages: %s %n", Thread.currentThread().getName(), msgs);
+                                                            ConsumeConcurrentlyContext context) {
+
+                System.out.printf("%d ==> %s Receive New Messages: %s %n", count.incrementAndGet(), Thread.currentThread().getName(), msgs);
                 return ConsumeConcurrentlyStatus.CONSUME_SUCCESS;
             }
         });
@@ -78,5 +82,6 @@ public class Consumer {
         consumer.start();
 
         System.out.printf("Consumer Started.%n");
+
     }
 }
