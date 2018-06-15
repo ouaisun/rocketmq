@@ -16,9 +16,10 @@
  */
 package org.apache.rocketmq.store.config;
 
-import java.io.File;
 import org.apache.rocketmq.common.annotation.ImportantField;
 import org.apache.rocketmq.store.ConsumeQueue;
+
+import java.io.File;
 
 public class MessageStoreConfig {
     //The root directory in which the log data is kept
@@ -31,6 +32,7 @@ public class MessageStoreConfig {
         + File.separator + "commitlog";
 
     // CommitLog file size,default is 1G
+    //  commitlog 文件大小是1G
     private int mapedFileSizeCommitLog = 1024 * 1024 * 1024;
     // ConsumeQueue file size,default is 30W
     private int mapedFileSizeConsumeQueue = 300000 * ConsumeQueue.CQ_STORE_UNIT_SIZE;

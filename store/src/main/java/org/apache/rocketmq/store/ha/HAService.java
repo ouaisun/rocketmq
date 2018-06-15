@@ -16,6 +16,14 @@
  */
 package org.apache.rocketmq.store.ha;
 
+import org.apache.rocketmq.common.ServiceThread;
+import org.apache.rocketmq.common.constant.LoggerName;
+import org.apache.rocketmq.remoting.common.RemotingUtil;
+import org.apache.rocketmq.store.CommitLog;
+import org.apache.rocketmq.store.DefaultMessageStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -32,13 +40,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.rocketmq.common.ServiceThread;
-import org.apache.rocketmq.common.constant.LoggerName;
-import org.apache.rocketmq.remoting.common.RemotingUtil;
-import org.apache.rocketmq.store.CommitLog;
-import org.apache.rocketmq.store.DefaultMessageStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class HAService {
     private static final Logger log = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
@@ -279,6 +280,7 @@ public class HAService {
             synchronized (this.requestsRead) {
                 if (!this.requestsRead.isEmpty()) {
                     for (CommitLog.GroupCommitRequest req : this.requestsRead) {
+                         // 等待Slave上传进度
                         boolean transferOK = HAService.this.push2SlaveMaxOffset.get() >= req.getNextOffset();
                         for (int i = 0; !transferOK && i < 5; i++) {
                             this.notifyTransferObject.waitForRunning(1000);
@@ -288,7 +290,7 @@ public class HAService {
                         if (!transferOK) {
                             log.warn("transfer messsage to slave timeout, " + req.getNextOffset());
                         }
-
+                        // 唤醒请求，并设置是否Slave同步成功
                         req.wakeupCustomer(transferOK);
                     }
 
@@ -435,11 +437,13 @@ public class HAService {
             int readSocketPos = this.byteBufferRead.position();
 
             while (true) {
+                // 读取到请求
                 int diff = this.byteBufferRead.position() - this.dispatchPostion;
                 if (diff >= msgHeaderSize) {
+                    // 读取masterPhyOffset、bodySize。使用dispatchPostion的原因是：处理数据“粘包”导致数据读取不完整。
                     long masterPhyOffset = this.byteBufferRead.getLong(this.dispatchPostion);
                     int bodySize = this.byteBufferRead.getInt(this.dispatchPostion + 8);
-
+                    // 校验 Master传输来的数据offset 是否和 Slave的CommitLog数据最大offset 是否相同。
                     long slavePhyOffset = HAService.this.defaultMessageStore.getMaxPhyOffset();
 
                     if (slavePhyOffset != 0) {
@@ -449,25 +453,26 @@ public class HAService {
                             return false;
                         }
                     }
-
+                    // 读取到消息
                     if (diff >= (msgHeaderSize + bodySize)) {
+                        // 写入CommitLog
                         byte[] bodyData = new byte[bodySize];
                         this.byteBufferRead.position(this.dispatchPostion + msgHeaderSize);
                         this.byteBufferRead.get(bodyData);
 
                         HAService.this.defaultMessageStore.appendToCommitLog(masterPhyOffset, bodyData);
-
+                        // 设置处理到的位置
                         this.byteBufferRead.position(readSocketPos);
                         this.dispatchPostion += msgHeaderSize + bodySize;
-
+                        // 上报到Master进度
                         if (!reportSlaveMaxOffsetPlus()) {
                             return false;
                         }
-
+                        // 继续循环
                         continue;
                     }
                 }
-
+                // 空间写满，重新分配空间
                 if (!this.byteBufferRead.hasRemaining()) {
                     this.reallocateByteBuffer();
                 }
@@ -549,7 +554,7 @@ public class HAService {
             while (!this.isStopped()) {
                 try {
                     if (this.connectMaster()) {
-
+                        // 若到满足上报间隔，上报到Master进度
                         if (this.isTimeToReportOffset()) {
                             boolean result = this.reportSlaveMaxOffset(this.currentReportedOffset);
                             if (!result) {
@@ -558,16 +563,16 @@ public class HAService {
                         }
 
                         this.selector.select(1000);
-
+                        // 处理读取事件
                         boolean ok = this.processReadEvent();
                         if (!ok) {
                             this.closeMaster();
                         }
-
+                        // 若进度有变化，上报到Master进度
                         if (!reportSlaveMaxOffsetPlus()) {
                             continue;
                         }
-
+                        // Master过久未返回数据，关闭连接
                         long interval =
                             HAService.this.getDefaultMessageStore().getSystemClock().now()
                                 - this.lastWriteTimestamp;

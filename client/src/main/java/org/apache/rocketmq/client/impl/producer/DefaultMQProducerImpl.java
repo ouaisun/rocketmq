@@ -446,10 +446,11 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         long beginTimestampFirst = System.currentTimeMillis();
         long beginTimestampPrev  = beginTimestampFirst;
         long endTimestamp        = beginTimestampFirst;
-        //5 获取public info 获取 Topic路由信息
+        //5 获取public info 获取 Topic路由信息 || 获取 Topic路由信息
         TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());
         if (topicPublishInfo != null && topicPublishInfo.ok()) {
-            MessageQueue mq = null;// 最后选择消息要发送到的队列
+            // 最后选择消息要发送到的队列
+            MessageQueue mq = null;
 
             Exception exception = null;
             // 最后一次发送结果
